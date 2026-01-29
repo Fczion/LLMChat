@@ -1,8 +1,8 @@
-# OAuthTest - Expo Google Sign-In Android App
+# LLMChat - Expo Google Sign-In Android App
 
 ## Project Documentation
 
-This document contains all architecture decisions, requirements, setup instructions, and implementation details for the OAuthTest Android application.
+This document contains all architecture decisions, requirements, setup instructions, and implementation details for the LLMChat Android application.
 
 ---
 
@@ -25,11 +25,12 @@ This document contains all architecture decisions, requirements, setup instructi
 
 ## Project Overview
 
-**OAuthTest** is an Android application built with Expo React Native that demonstrates Google Sign-In authentication using the native Android SDK. The app features:
+**LLMChat** is an Android application built with Expo React Native that demonstrates Google Sign-In authentication using the native Android SDK. The app features:
 
 - A welcome screen with app branding
 - Native Google Sign-In integration
 - A success screen displaying all user profile data
+- Supabase database integration for login tracking
 - Built as an APK for direct device installation
 
 ---
@@ -47,9 +48,9 @@ This document contains all architecture decisions, requirements, setup instructi
 | FR-05 | Show user data: name, email, photo, ID | Done |
 | FR-06 | Provide sign-out functionality | Done |
 | FR-07 | Navigate back to welcome after sign-out | Done |
-| FR-08 | Record user login to database on sign-in | Pending |
-| FR-09 | Capture all user data (name, email, photo, ID) in database | Pending |
-| FR-10 | Store login timestamp for each sign-in | Pending |
+| FR-08 | Record user login to database on sign-in | Done |
+| FR-09 | Capture all user data (name, email, photo, ID) in database | Done |
+| FR-10 | Store login timestamp for each sign-in | Done |
 
 ### Non-Functional Requirements
 
@@ -149,7 +150,7 @@ This document contains all architecture decisions, requirements, setup instructi
 ## Project Structure
 
 ```
-OAuthTest/
+LLMChat/
 ├── app/                           # Expo Router screens (file-based routing)
 │   ├── _layout.tsx               # Root layout - wraps app with AuthProvider
 │   ├── index.tsx                 # Welcome screen - entry point
@@ -157,10 +158,15 @@ OAuthTest/
 ├── components/
 │   └── GoogleSignInButton.tsx    # Reusable Google sign-in button
 ├── contexts/
-│   └── AuthContext.tsx           # Authentication state & functions
+│   └── AuthContext.tsx           # Authentication state & functions + login tracking
+├── lib/
+│   └── supabase.ts               # Supabase client initialization
+├── services/
+│   └── loginTracker.ts           # Login tracking service for Supabase
+├── .env                          # Environment variables (gitignored)
 ├── app.json                      # Expo configuration
 ├── eas.json                      # EAS Build profiles
-├── claude.md                     # This documentation file
+├── CLAUDE.md                     # This documentation file
 ├── package.json                  # Dependencies
 └── tsconfig.json                 # TypeScript configuration
 ```
@@ -505,7 +511,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 ### Project Structure with Supabase
 
 ```
-OAuthTest/
+LLMChat/
 ├── app/
 │   ├── _layout.tsx
 │   ├── index.tsx
@@ -515,10 +521,10 @@ OAuthTest/
 ├── contexts/
 │   └── AuthContext.tsx          # Modified - calls loginTracker
 ├── lib/
-│   └── supabase.ts              # NEW - Supabase client
+│   └── supabase.ts              # Supabase client
 ├── services/
-│   └── loginTracker.ts          # NEW - Login tracking logic
-├── .env                          # NEW - Credentials (gitignored)
+│   └── loginTracker.ts          # Login tracking logic
+├── .env                          # Credentials (gitignored)
 ├── app.json
 ├── eas.json
 ├── CLAUDE.md
@@ -693,17 +699,17 @@ After implementation, verify the setup:
 - [ ] Test on device
 
 ### Phase 6: Supabase Integration
-- [ ] Create Supabase project
-- [ ] Create `user_logins` table (login events)
-- [ ] Create `users` table (unique users with stats)
-- [ ] Get API credentials (URL and anon key)
-- [ ] Install `@supabase/supabase-js` package
-- [ ] Create `lib/supabase.ts` - Supabase client
-- [ ] Create `services/loginTracker.ts` - Login tracking service
-- [ ] Modify `contexts/AuthContext.tsx` - Add login recording
-- [ ] Create `.env` with Supabase credentials
-- [ ] Test login recording (verify both tables)
-- [ ] Verify user stats increment on repeat login
+- [x] Create Supabase project
+- [x] Create `user_logins` table (login events)
+- [x] Create `users` table (unique users with stats)
+- [x] Get API credentials (URL and anon key)
+- [x] Install `@supabase/supabase-js` package
+- [x] Create `lib/supabase.ts` - Supabase client
+- [x] Create `services/loginTracker.ts` - Login tracking service
+- [x] Modify `contexts/AuthContext.tsx` - Add login recording
+- [x] Create `.env` with Supabase credentials
+- [x] Test login recording (verify both tables)
+- [x] Verify user stats increment on repeat login
 
 ---
 
@@ -711,10 +717,12 @@ After implementation, verify the setup:
 
 | Setting | Value |
 |---------|-------|
-| App Name | OAuthTest |
-| Package Name | com.jmcastro.oauthtest |
-| Expo Slug | oauthtest |
-| Deep Link Scheme | oauthtest |
+| App Name | LLMChat |
+| Package Name | com.jmcastro.llmchat |
+| Expo Slug | llmchat |
+| Deep Link Scheme | llmchat |
+| Supabase Project | zdjdavmokokspsurzfiq |
+| GitHub Repo | https://github.com/Fczion/LLMChat |
 
 ---
 
@@ -724,6 +732,7 @@ After implementation, verify the setup:
 |------|---------|---------|
 | 2026-01-28 | 0.1.0 | Initial project setup and documentation |
 | 2026-01-29 | 0.2.0 | Added Supabase integration plan for login tracking |
+| 2026-01-29 | 0.3.0 | Implemented Supabase integration - login tracking fully functional |
 
 ---
 
