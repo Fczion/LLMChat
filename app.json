@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "OAuthTest",
-    "slug": "oauthtest",
+    "name": "LLMChat",
+    "slug": "llmchat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "oauthtest",
+    "scheme": "llmchat",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jmcastro.oauthtest"
+      "bundleIdentifier": "com.jmcastro.llmchat"
     },
     "android": {
-      "package": "com.jmcastro.oauthtest",
+      "package": "com.jmcastro.llmchat",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,7 +35,10 @@
       "expo-router"
     ],
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "749d15a4-c82b-4724-98b1-afeb05b51275"
+      }
     }
   }
 }

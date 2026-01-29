@@ -6,10 +6,11 @@ import {
   statusCodes,
   type User,
 } from '@react-native-google-signin/google-signin';
+import { recordLogin } from '../services/loginTracker';
 
 // Configure Google Sign-In
 // TODO: Replace with your Web Client ID from Google Cloud Console
-const WEB_CLIENT_ID = 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com';
+const WEB_CLIENT_ID = '118750976608-3mbno6gnc3s38sakrm34q5q2uaubv3c8.apps.googleusercontent.com';
 
 GoogleSignin.configure({
   webClientId: WEB_CLIENT_ID,
@@ -70,6 +71,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (isSuccessResponse(response)) {
         setUser(response.data);
+
+        // Record login to Supabase database
+        try {
+          await recordLogin({
+            google_id: response.data.user.id,
+            email: response.data.user.email,
+            full_name: response.data.user.name,
+            given_name: response.data.user.givenName,
+            family_name: response.data.user.familyName,
+            photo_url: response.data.user.photo,
+            id_token: response.data.idToken,
+          });
+        } catch (dbError) {
+          // Log but don't block sign-in if database write fails
+          console.error('Failed to record login to database:', dbError);
+        }
       } else {
         // Sign in was cancelled
         setError('Sign-in was cancelled');

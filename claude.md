@@ -17,8 +17,9 @@ This document contains all architecture decisions, requirements, setup instructi
 7. [EAS Build Configuration](#eas-build-configuration)
 8. [Implementation Details](#implementation-details)
 9. [User Data Available](#user-data-available)
-10. [Troubleshooting](#troubleshooting)
-11. [Progress Tracking](#progress-tracking)
+10. [Supabase Integration](#supabase-integration)
+11. [Troubleshooting](#troubleshooting)
+12. [Progress Tracking](#progress-tracking)
 
 ---
 
@@ -46,6 +47,9 @@ This document contains all architecture decisions, requirements, setup instructi
 | FR-05 | Show user data: name, email, photo, ID | Done |
 | FR-06 | Provide sign-out functionality | Done |
 | FR-07 | Navigate back to welcome after sign-out | Done |
+| FR-08 | Record user login to database on sign-in | Pending |
+| FR-09 | Capture all user data (name, email, photo, ID) in database | Pending |
+| FR-10 | Store login timestamp for each sign-in | Pending |
 
 ### Non-Functional Requirements
 
@@ -136,6 +140,7 @@ This document contains all architecture decisions, requirements, setup instructi
 | Language | TypeScript | 5.x |
 | Auth Library | @react-native-google-signin/google-signin | Latest |
 | Navigation | expo-router | 3.x |
+| Database | Supabase | Latest |
 | Build System | EAS Build | Latest |
 | Package Manager | npm | 10.x |
 
@@ -345,6 +350,257 @@ After successful Google Sign-In, the following user data is available:
 
 ---
 
+## Supabase Integration
+
+### Overview
+
+Supabase is used to store user login records. Every time a user signs in with Google, the app records their profile information and a timestamp to the database.
+
+### Database Schema
+
+The database uses two tables:
+1. **`user_logins`**: Records every login event (audit trail/analytics)
+2. **`users`**: Tracks unique users with aggregated stats (login count, first/last login)
+
+#### Table 1: `user_logins` (Login Events)
+
+Stores every login event for analytics and audit purposes.
+
+```sql
+CREATE TABLE user_logins (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  google_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  given_name TEXT,
+  family_name TEXT,
+  photo_url TEXT,
+  id_token TEXT,
+  login_timestamp TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_user_logins_google_id ON user_logins(google_id);
+CREATE INDEX idx_user_logins_email ON user_logins(email);
+CREATE INDEX idx_user_logins_timestamp ON user_logins(login_timestamp DESC);
+```
+
+#### Table 2: `users` (Unique Users)
+
+Tracks unique users with aggregated login statistics.
+
+```sql
+CREATE TABLE users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  google_id TEXT UNIQUE NOT NULL,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  given_name TEXT,
+  family_name TEXT,
+  photo_url TEXT,
+  first_login_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  last_login_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  login_count INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_users_google_id ON users(google_id);
+CREATE INDEX idx_users_email ON users(email);
+```
+
+#### Complete SQL Script
+
+Run this in Supabase SQL Editor to create both tables:
+
+```sql
+-- Create user_logins table (login events)
+CREATE TABLE user_logins (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  google_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  given_name TEXT,
+  family_name TEXT,
+  photo_url TEXT,
+  id_token TEXT,
+  login_timestamp TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_user_logins_google_id ON user_logins(google_id);
+CREATE INDEX idx_user_logins_email ON user_logins(email);
+CREATE INDEX idx_user_logins_timestamp ON user_logins(login_timestamp DESC);
+
+-- Create users table (unique users with stats)
+CREATE TABLE users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  google_id TEXT UNIQUE NOT NULL,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  given_name TEXT,
+  family_name TEXT,
+  photo_url TEXT,
+  first_login_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  last_login_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  login_count INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_users_google_id ON users(google_id);
+CREATE INDEX idx_users_email ON users(email);
+```
+
+### Supabase Setup Instructions
+
+#### Step 1: Create Supabase Project
+
+1. Go to https://supabase.com/dashboard
+2. Click "New Project"
+3. Fill in project details:
+   - Name: `oauthtest`
+   - Database Password: (create a strong password and save it)
+   - Region: Select closest to your users
+4. Click "Create new project"
+5. Wait for project to be provisioned (~2 minutes)
+
+#### Step 2: Create Database Tables
+
+1. In Supabase dashboard, go to **SQL Editor**
+2. Click "New query"
+3. Paste the `user_logins` table SQL from above
+4. Click "Run" to execute
+5. Verify table created in **Table Editor**
+
+#### Step 3: Configure Table Permissions
+
+For development/testing (disable RLS):
+
+1. Go to **Table Editor** → `user_logins`
+2. Click on **RLS** tab
+3. Ensure RLS is disabled (or configure policies if needed)
+
+For production, consider enabling RLS with appropriate policies.
+
+#### Step 4: Get API Credentials
+
+1. Go to **Project Settings** (gear icon)
+2. Click **API** in the sidebar
+3. Copy these values:
+   - **Project URL**: `https://xxxxx.supabase.co`
+   - **anon public key**: `eyJhbGciOiJI...`
+
+### Environment Variables
+
+Create a `.env` file in project root:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+**Important**: Add `.env` to `.gitignore` to avoid committing credentials.
+
+### Project Structure with Supabase
+
+```
+OAuthTest/
+├── app/
+│   ├── _layout.tsx
+│   ├── index.tsx
+│   └── success.tsx
+├── components/
+│   └── GoogleSignInButton.tsx
+├── contexts/
+│   └── AuthContext.tsx          # Modified - calls loginTracker
+├── lib/
+│   └── supabase.ts              # NEW - Supabase client
+├── services/
+│   └── loginTracker.ts          # NEW - Login tracking logic
+├── .env                          # NEW - Credentials (gitignored)
+├── app.json
+├── eas.json
+├── CLAUDE.md
+└── package.json
+```
+
+### Architecture Decision: Supabase
+
+**Decision**: Use Supabase for database backend
+
+**Alternatives Considered**:
+- Firebase Firestore
+- AWS Amplify
+- Custom backend with PostgreSQL
+
+**Rationale**:
+- PostgreSQL-based (familiar, powerful SQL capabilities)
+- Generous free tier for development
+- Built-in REST API (no backend code needed)
+- Real-time subscriptions available for future features
+- Easy dashboard for viewing/managing data
+- Works well with React Native/Expo
+
+**Trade-off**: Requires internet connection for login tracking (handled gracefully with try/catch)
+
+### Verifying the Integration
+
+After implementation, verify the setup:
+
+1. **Check tables exist**:
+   ```sql
+   SELECT * FROM user_logins LIMIT 1;
+   SELECT * FROM users LIMIT 1;
+   ```
+
+2. **Sign in and verify records**:
+   - Open the app and sign in with Google
+   - In Supabase dashboard, go to Table Editor
+   - Check `user_logins` - should have a new row with login data
+   - Check `users` - should have a row with login_count = 1
+
+3. **Sign in again and verify count increments**:
+   - Sign out and sign in again
+   - `user_logins` should have 2 rows
+   - `users` should have login_count = 2
+
+4. **Query login history**:
+   ```sql
+   SELECT email, full_name, login_timestamp
+   FROM user_logins
+   ORDER BY login_timestamp DESC
+   LIMIT 10;
+   ```
+
+5. **Query user stats**:
+   ```sql
+   SELECT email, full_name, login_count, first_login_at, last_login_at
+   FROM users
+   ORDER BY last_login_at DESC;
+   ```
+
+### Troubleshooting Supabase
+
+#### Login not being recorded
+
+1. Check browser console/metro logs for errors
+2. Verify Supabase URL and key are correct
+3. Ensure table exists with correct column names
+4. Check RLS is disabled or policies allow inserts
+
+#### "relation does not exist" error
+
+- Table wasn't created. Run the CREATE TABLE SQL in SQL Editor.
+
+#### Network/connection errors
+
+- Check internet connectivity
+- Verify Supabase project is active (not paused)
+- Confirm URL doesn't have typos
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -436,6 +692,19 @@ After successful Google Sign-In, the following user data is available:
 - [ ] Build preview APK
 - [ ] Test on device
 
+### Phase 6: Supabase Integration
+- [ ] Create Supabase project
+- [ ] Create `user_logins` table (login events)
+- [ ] Create `users` table (unique users with stats)
+- [ ] Get API credentials (URL and anon key)
+- [ ] Install `@supabase/supabase-js` package
+- [ ] Create `lib/supabase.ts` - Supabase client
+- [ ] Create `services/loginTracker.ts` - Login tracking service
+- [ ] Modify `contexts/AuthContext.tsx` - Add login recording
+- [ ] Create `.env` with Supabase credentials
+- [ ] Test login recording (verify both tables)
+- [ ] Verify user stats increment on repeat login
+
 ---
 
 ## Configuration Values
@@ -454,6 +723,7 @@ After successful Google Sign-In, the following user data is available:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-01-28 | 0.1.0 | Initial project setup and documentation |
+| 2026-01-29 | 0.2.0 | Added Supabase integration plan for login tracking |
 
 ---
 
