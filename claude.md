@@ -18,8 +18,9 @@ This document contains all architecture decisions, requirements, setup instructi
 8. [Implementation Details](#implementation-details)
 9. [User Data Available](#user-data-available)
 10. [Supabase Integration](#supabase-integration)
-11. [Troubleshooting](#troubleshooting)
-12. [Progress Tracking](#progress-tracking)
+11. [ChatGPT Integration](#chatgpt-integration)
+12. [Troubleshooting](#troubleshooting)
+13. [Progress Tracking](#progress-tracking)
 
 ---
 
@@ -31,6 +32,7 @@ This document contains all architecture decisions, requirements, setup instructi
 - Native Google Sign-In integration
 - A success screen displaying all user profile data
 - Supabase database integration for login tracking
+- ChatGPT-powered AI chat with conversation persistence
 - Built as an APK for direct device installation
 
 ---
@@ -51,6 +53,11 @@ This document contains all architecture decisions, requirements, setup instructi
 | FR-08 | Record user login to database on sign-in | Done |
 | FR-09 | Capture all user data (name, email, photo, ID) in database | Done |
 | FR-10 | Store login timestamp for each sign-in | Done |
+| FR-11 | Provide chat interface accessible from success screen | Done |
+| FR-12 | Send user messages to ChatGPT (gpt-4o-mini) | Done |
+| FR-13 | Display AI responses in chat interface | Done |
+| FR-14 | Store all chat messages in database | Done |
+| FR-15 | Persist chat history across app sessions | Done |
 
 ### Non-Functional Requirements
 
@@ -154,7 +161,8 @@ LLMChat/
 ├── app/                           # Expo Router screens (file-based routing)
 │   ├── _layout.tsx               # Root layout - wraps app with AuthProvider
 │   ├── index.tsx                 # Welcome screen - entry point
-│   └── success.tsx               # Success screen - shows user data
+│   ├── success.tsx               # Success screen - shows user data + chat button
+│   └── chat.tsx                  # Chat screen - AI conversation interface
 ├── components/
 │   └── GoogleSignInButton.tsx    # Reusable Google sign-in button
 ├── contexts/
@@ -162,7 +170,9 @@ LLMChat/
 ├── lib/
 │   └── supabase.ts               # Supabase client initialization
 ├── services/
-│   └── loginTracker.ts           # Login tracking service for Supabase
+│   ├── loginTracker.ts           # Login tracking service for Supabase
+│   ├── openaiService.ts          # OpenAI API integration (ChatGPT)
+│   └── chatService.ts            # Chat message storage in Supabase
 ├── .env                          # Environment variables (gitignored)
 ├── app.json                      # Expo configuration
 ├── eas.json                      # EAS Build profiles
@@ -607,6 +617,112 @@ After implementation, verify the setup:
 
 ---
 
+## ChatGPT Integration
+
+### Overview
+
+The app includes an AI chat feature powered by OpenAI's gpt-4o-mini model. Users can have conversations with ChatGPT, and all messages are stored in Supabase for persistence across sessions.
+
+### Database Schema
+
+#### Table: `chat_messages`
+
+```sql
+CREATE TABLE chat_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_google_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_chat_messages_user ON chat_messages(user_google_id);
+CREATE INDEX idx_chat_messages_timestamp ON chat_messages(user_google_id, created_at ASC);
+```
+
+### OpenAI API Setup
+
+1. Go to https://platform.openai.com/
+2. Sign up or log in
+3. Navigate to API Keys: https://platform.openai.com/api-keys
+4. Click "Create new secret key"
+5. Copy the key (starts with `sk-`)
+6. Add to `.env` file:
+   ```
+   EXPO_PUBLIC_OPENAI_API_KEY=sk-your-key-here
+   ```
+
+### Architecture
+
+**Data Flow:**
+```
+User types message
+       ↓
+Save user message to Supabase (chat_messages)
+       ↓
+Build conversation history array
+       ↓
+Send to OpenAI API (gpt-4o-mini)
+       ↓
+Receive assistant response
+       ↓
+Save assistant message to Supabase
+       ↓
+Update UI with new message
+```
+
+**Files:**
+- `services/openaiService.ts` - Handles OpenAI API calls
+- `services/chatService.ts` - Manages chat message storage in Supabase
+- `app/chat.tsx` - Chat screen UI component
+
+### Chat Screen Features
+
+- Message bubbles (user = right/blue, assistant = left/gray)
+- Text input with send button
+- Loading indicator while waiting for AI response
+- Auto-scroll to latest message
+- Empty state with helpful prompt
+- Error display for API failures
+- Chat history loads on screen mount
+
+### Verifying the Integration
+
+1. **After creating chat_messages table**:
+   ```sql
+   SELECT * FROM chat_messages LIMIT 1;
+   ```
+
+2. **Test the chat**:
+   - Log in with Google
+   - Tap "Chat with AI" button
+   - Send a test message
+   - Verify response appears
+   - Check Supabase `chat_messages` table
+
+3. **Test persistence**:
+   - Close and reopen app
+   - Navigate to chat
+   - Previous messages should load
+
+### Troubleshooting Chat
+
+#### "OpenAI API key not configured" error
+- Ensure `EXPO_PUBLIC_OPENAI_API_KEY` is set in `.env`
+- Restart the Expo dev server after adding the key
+
+#### Messages not saving
+- Verify `chat_messages` table exists in Supabase
+- Check RLS is disabled or policies allow inserts
+- Check console for Supabase errors
+
+#### Slow responses
+- gpt-4o-mini typically responds in 1-3 seconds
+- Check network connectivity
+- OpenAI may have rate limits during high usage
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -711,6 +827,17 @@ After implementation, verify the setup:
 - [x] Test login recording (verify both tables)
 - [x] Verify user stats increment on repeat login
 
+### Phase 7: ChatGPT Integration
+- [x] Get OpenAI API key from platform.openai.com
+- [x] Create `chat_messages` table in Supabase
+- [x] Create `services/openaiService.ts` - OpenAI API calls
+- [x] Create `services/chatService.ts` - Chat message storage
+- [x] Create `app/chat.tsx` - Chat screen UI
+- [x] Modify `app/success.tsx` - Add "Chat with AI" button
+- [x] Update `.env` with OpenAI API key
+- [x] Test chat functionality end-to-end
+- [x] Verify messages persist across sessions
+
 ---
 
 ## Configuration Values
@@ -722,6 +849,7 @@ After implementation, verify the setup:
 | Expo Slug | llmchat |
 | Deep Link Scheme | llmchat |
 | Supabase Project | zdjdavmokokspsurzfiq |
+| OpenAI Model | gpt-4o-mini |
 | GitHub Repo | https://github.com/Fczion/LLMChat |
 
 ---
@@ -733,7 +861,8 @@ After implementation, verify the setup:
 | 2026-01-28 | 0.1.0 | Initial project setup and documentation |
 | 2026-01-29 | 0.2.0 | Added Supabase integration plan for login tracking |
 | 2026-01-29 | 0.3.0 | Implemented Supabase integration - login tracking fully functional |
+| 2026-01-29 | 0.4.0 | Added ChatGPT chat feature with message persistence |
 
 ---
 
-*This documentation is maintained as part of the OAuthTest project.*
+*This documentation is maintained as part of the LLMChat project.*

@@ -91,6 +91,15 @@ export default function SuccessScreen() {
           )}
         </View>
 
+        {/* Chat with AI Button */}
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => router.push('/chat')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.chatButtonText}>Chat with AI</Text>
+        </TouchableOpacity>
+
         {/* Sign Out Button */}
         <TouchableOpacity
           style={styles.signOutButton}
@@ -247,6 +256,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     padding: 12,
     borderRadius: 8,
+  },
+  chatButton: {
+    backgroundColor: '#4285F4',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  chatButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   signOutButton: {
     backgroundColor: '#EA4335',
